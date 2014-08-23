@@ -37,6 +37,8 @@ unsigned long long DCF77::processingBuffer    = 0;
 volatile unsigned long long DCF77::filledBuffer          = 0;
 volatile bool               DCF77::filledBufferAvailable = false;
 
+DCF77::ParityFlags DCF77::flags = {0,0,0,0};
+
 DCF77::DCF77(int _DCFPin, int _DCFInterrupt)
 {
   DCFPin       = _DCFPin;
@@ -61,15 +63,11 @@ void DCF77::interruptHandler()
   
   // flank detected too quickly after the previous flank
   if ((flankTime - previousLeadingEdge) < DCF_REJECTION_TIME)
-  {
-    return; // TODO store the short flank for the next time
-  }
+    return;
   
   // pulse is too short
   if ((flankTime - leadingEdge) < DCF_REJECT_PULSE_WIDTH)
-  {
-    return; // TODO check if there where a short flank, if yes interpolate!
-  }
+    return;
   
   if (HIGH == value)
   {
@@ -138,16 +136,47 @@ bool DCF77::hasNewTime()
   return filledBufferAvailable;
 }
 
-int* DCF77::getTime(int time[])
+bool DCF77::getTime(int* time)
 {
   processingBuffer = filledBuffer;
   filledBufferAvailable = false;
   
+  calculateBufferParities();
+  
   struct DCF77Buffer *rx_buffer;
   rx_buffer = (struct DCF77Buffer *)(unsigned long long)&processingBuffer;
   
-  time[0] = rx_buffer->Min  - ((rx_buffer->Min / 16)  * 6);
-  time[1] = rx_buffer->Hour - ((rx_buffer->Hour / 16) * 6);
+  if (flags.parityMin == rx_buffer->P1 && flags.parityHour == rx_buffer->P2)
+  {
+    time[0] = rx_buffer->Min  - ((rx_buffer->Min / 16)  * 6);
+    time[1] = rx_buffer->Hour - ((rx_buffer->Hour / 16) * 6);
+    
+    return true;
+  }
   
-  return time;
+  return false;
+}
+
+void DCF77::calculateBufferParities() {	
+  flags.parityFlag = 0;	
+    
+  for(int pos = 0; pos < 59; pos++) 
+  {
+    bool s = (processingBuffer >> pos) & 1;  
+
+    if (21 == pos || 29 == pos || 36 == pos) 
+      flags.parityFlag = 0;
+
+    if (28 == pos) 
+      flags.parityMin = flags.parityFlag;
+
+    if (35 == pos)
+      flags.parityHour = flags.parityFlag;
+
+    if (58 == pos)
+      flags.parityDate = flags.parityFlag;
+      
+    if (1 == s)
+      flags.parityFlag = flags.parityFlag ^ 1;
+  }
 }

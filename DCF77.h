@@ -69,11 +69,19 @@ private:
     unsigned long long P3       :1; // parity
   };
   
+  struct ParityFlags{
+    unsigned char parityFlag :1;
+    unsigned char parityMin  :1;
+    unsigned char parityHour :1;
+    unsigned char parityDate :1;
+  } static flags;
+  
 protected:
   static void interruptHandler();
   static void appendSignal(unsigned char signal);
   static void finalizeBuffer();
   static void initBuffer();
+  static void calculateBufferParities();
 
 public:
   DCF77(int _DCFPin, int _DCFInterrupt);
@@ -81,7 +89,7 @@ public:
   void start();
   void stop();
   bool hasNewTime();
-  int* getTime(int time[2]);
+  bool getTime(int* time);
 };
 
 #endif

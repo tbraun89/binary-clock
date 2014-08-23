@@ -22,6 +22,8 @@
 #define DCF_PIN       2
 #define DCF_INTERRUPT INT1
 
+#define UPDATE_LEDS_DELAY 1000
+
 // Minute Pins
 #define MIN_1   12
 #define MIN_2   11
@@ -31,16 +33,17 @@
 #define MIN_32  7
 // Hour Pins
 #define HOUR_1  6
-#define HOUR_2  13
-#define HOUR_4  3
-#define HOUR_8  4 
-#define HOUR_16 5
+#define HOUR_2  5
+#define HOUR_4  4
+#define HOUR_8  3 
+#define HOUR_16 13
 
-DCF77 DCF = DCF77(DCF_PIN, DCF_INTERRUPT);
+DCF77 DCF      = DCF77(DCF_PIN, DCF_INTERRUPT);
+bool  needSync = true;
 
 void setup() 
 {
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   initLedPins();
   DCF.start();
@@ -49,22 +52,38 @@ void setup()
 
 void loop() 
 {
-  int* DCFtime;
-  int  DCFtimeBuffer[2] = { 0 };
+  int DCFtimeBuffer[2] = { 0 };
   
-  if (DCF.hasNewTime()) {
-    DCFtime    = DCF.getTime(DCFtimeBuffer);
-
-    DateTime.sync(DateTime.makeTime(0, DCFtime[0], DCFtime[1], 0, 0, 0));
+  if (needSync)
+  {
+    if (DCF.hasNewTime()) 
+    {
+      if (DCF.getTime(DCFtimeBuffer))
+      {
+        DateTime.sync(DateTime.makeTime(0, DCFtimeBuffer[0], DCFtimeBuffer[1], 0, 0, 0));
+        
+        if (DateTime.available())
+        {
+          needSync = false;
+          DCF.stop();
+        }
+      }
+    }
   }
-  
-  delay(1000);
 
   if (DateTime.available())
   {
     writeMinute(DateTime.Minute);
     writeHour(DateTime.Hour);
+    
+    if (2 == DateTime.Hour)
+    {
+      needSync = true;
+      DCF.start();
+    }
   }
+    
+  delay(UPDATE_LEDS_DELAY);
 }
 
 void writeMinute(int val) {
