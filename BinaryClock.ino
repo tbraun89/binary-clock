@@ -39,6 +39,7 @@
 #define HOUR_16 13
 
 DCF77 DCF      = DCF77(DCF_PIN, DCF_INTERRUPT);
+int   syncHour = 0;
 bool  needSync = true;
 
 void setup() 
@@ -64,6 +65,7 @@ void loop()
         
         if (DateTime.available())
         {
+          syncHour = DateTime.Hour;
           needSync = false;
           DCF.stop();
         }
@@ -76,7 +78,7 @@ void loop()
     writeMinute(DateTime.Minute);
     writeHour(DateTime.Hour);
     
-    if (2 == DateTime.Hour)
+    if (DateTime.Hour != syncHour)
     {
       needSync = true;
       DCF.start();
